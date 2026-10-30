@@ -13,22 +13,20 @@ client = genai.Client(api_key=api_key)
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
-# Instruções para o prompt
-if not st.session_state.chat_history:
-    st.session_state.chat_history.append(('assistant', 
-                                          '''
-                                          Olá, eu sou um assistente de futebol. 
-                                          
-                                          Você pode me perguntar sobre curiosidades como impedimento, novas regras ou toque
-                                          de mão.
+st.chat_message('assistant').write( 
+                                    '''
+                                    Olá, eu sou um assistente de futebol. 
+                                            
+                                    Você pode me perguntar sobre curiosidades como impedimento, novas regras ou toque
+                                    de mão.
 
-                                          Posso responder sobre jogadores de futebol que atuam ou que se aposentaram.
+                                    Posso responder sobre jogadores de futebol que atuam ou que se aposentaram.
 
-                                          Também posso responder sobre eventos passados como campeonatos locais ou Copa
-                                          do Mundo.
+                                    Também posso responder sobre eventos passados como campeonatos locais ou Copa
+                                    do Mundo.
 
-                                          Como posso te ajudar?
-                                          '''))
+                                    Como posso te ajudar?
+                                    ''')
 
 # Entrada do usuário
 user_message = st.chat_input('Escreva sua mensagem...')
@@ -43,7 +41,7 @@ if user_message:
     # Adiciona a mensagem ao histórico
     st.session_state.chat_history.append(('user', user_message))
 
-    with st.spinner('O agente está pensando'):
+    with st.spinner('Pensando...'):
 
         # Restrições e orientações do que o chatbot deve responder
         system_prompt = f"""
@@ -54,16 +52,13 @@ if user_message:
         isso, não responda também sobre derivados do futebol.
         """
 
-        # Pegando o system_prompt para retornar o contexto com a mensagem do usuário
-        full_input = f"{system_prompt}\n\nMensagem do usuário:\n\"\"\"{user_message}\n\"\"\""
-
         # Resgatando todo o contexto da conversa
         context = [
-            *[
-                {'role': role, 'parts': [{'text': msg}]} for role, msg in st.session_state.chat_history
-            ],
-            # Retorna a ultima mensagem
-            {'role': 'user', 'parts': [{'text': full_input}]}
+            {
+                'role': 'model' if role == 'assistant' else 'user', 
+                'parts': [{'text': message}]
+            }
+            for role, message in st.session_state.chat_history
         ]
 
         # Configurações da resposta como modelo, contexto e segurança    
@@ -71,19 +66,20 @@ if user_message:
             model='gemini-3.5-flash-lite',
             contents=context,
             config=types.GenerateContentConfig(
-                safety_settings = [
-                    types.SafetySetting(
-                    category='HARM_CATEGORY_HATE_SPEECH',threshold='BLOCK_ONLY_HIGH'),
-                ],
+                system_instruction=system_prompt,
                 max_output_tokens=1000,
-                temperature=1
+                temperature=0.4
             )
         )
 
-        # Retorno apenas do texto da resposta
-        assistant_reply = response.text
+        try:
+            # Retorno apenas do texto da resposta
+            assistant_reply = response.text
 
-        # Escreve na tela
-        st.chat_message('assistant').write(assistant_reply)
-        # Adiciona ao contexto da conversa
-        st.session_state.chat_history.append(('assistant', assistant_reply))
+            # Escreve na tela
+            st.chat_message('assistant').write(assistant_reply)
+            # Adiciona ao contexto da conversa
+            st.session_state.chat_history.append(('assistant', assistant_reply))
+
+        except Exception as e:
+            st.write(f'Erro: {e}')
